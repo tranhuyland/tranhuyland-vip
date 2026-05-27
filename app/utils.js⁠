@@ -1,6 +1,7 @@
 export async function getGoogleSheetData() {
   // ĐÃ SỬA: Thay chính xác đường link trích xuất CSV gốc từ file index.html của anh
-  const sheetUrl = "https://docs.google.com/spreadsheets/d/1-LupBV6uNuUitz4vF6pFv6MupuVDMujafqhjQBNNPTA/export?format=csv";
+  const sheetUrl = "https://docs.google.com/spreadsheets/d/1-LupBV6uNuUitz4vF6pFv6MupuVDMujafqhjQBNNPTA/export?format=csv&t=123";
+
 
   try {
     // Tự động làm mới dữ liệu sau mỗi 5 phút (ISR)
