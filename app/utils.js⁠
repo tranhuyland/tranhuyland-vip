@@ -1,9 +1,9 @@
 export async function getGoogleSheetData() {
-  // Đường dẫn link CSV lấy trực tiếp từ file cấu hình index.html của anh
+  // ĐÃ SỬA: Thay chính xác đường link trích xuất CSV gốc từ file index.html của anh
   const sheetUrl = "https://docs.google.com/spreadsheets/d/1-LupBV6uNuUitz4vF6pFv6MupuVDMujafqhjQBNNPTA/export?format=csv";
 
   try {
-    // Tự động revalidate (làm mới cache) sau mỗi 5 phút (300 giây)
+    // Tự động làm mới dữ liệu sau mỗi 5 phút (ISR)
     const res = await fetch(sheetUrl, {
       next: { revalidate: 300 }
     });
@@ -49,7 +49,7 @@ export async function getGoogleSheetData() {
         // Làm sạch hoàn toàn ký tự xuống dòng ẩn trong ô
         val = val.replace(/[\r\n]/g, "").trim();
 
-        // Ép kiểu dữ liệu chuẩn khít với file index.html cũ của anh
+        // Ép kiểu dữ liệu chuẩn khít với file cấu hình của anh
         if (header === 'id') {
           obj[header] = parseInt(val) || (rowIndex + 1);
         } else if (header === 'soGia') {
