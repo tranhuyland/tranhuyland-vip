@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getGoogleSheetData } from './utils';
 import Link from 'next/link'; 
 
