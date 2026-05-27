@@ -3,26 +3,28 @@ import Link from 'next/link';
 
 export async function generateStaticParams() {
   const data = await getGoogleSheetData();
+  // Ép buộc hệ thống sinh đường link tĩnh dựa hoàn toàn vào cột ID trong file Sheets của anh
   return data.map((item) => ({
-    slug: item.slug ? item.slug.toString() : item.id.toString(),
+    slug: item.id ? item.id.toString() : '',
   }));
 }
 
 export async function generateMetadata({ params }) {
   const data = await getGoogleSheetData();
-  const item = data.find(i => i.slug === params.slug || i.id.toString() === params.slug);
+  const item = data.find(i => i.id.toString() === params.slug);
   
   if (!item) return { title: 'Không tìm thấy sản phẩm | Trần Huy Land' };
   
   return {
-    title: `${item.tieude} | Trần Huy Land`,
-    description: `Giá bán: ${item.gia}. Diện tích: ${item.dienTich}. Vị trí: ${item.khuVucFull || item.khuVuc}.`,
+    title: `${item.tieude || 'Nhà đất'} | Trần Huy Land`,
+    description: `Giá bán: ${item.gia || 'Thỏa thuận'}. Vị trí: ${item.khuVucFull || 'Đà Nẵng'}.`,
   };
 }
 
 export default async function PropertyDetail({ params }) {
   const data = await getGoogleSheetData();
-  const item = data.find(i => i.slug === params.slug || i.id.toString() === params.slug);
+  // Tìm kiếm căn nhà đất chính xác theo ID
+  const item = data.find(i => i.id.toString() === params.slug);
 
   if (!item) {
     return (
@@ -33,7 +35,10 @@ export default async function PropertyDetail({ params }) {
     );
   }
 
-  const danhSachAnh = item.anh ? item.anh.split(',').map(url => url.trim()) : [];
+  // Bắt lỗi nếu cột ảnh bị trống
+  const danhSachAnh = (item && item.anh && typeof item.anh === 'string') 
+    ? item.anh.split(',').map(url => url.trim()).filter(url => url !== '') 
+    : [];
 
   return (
     <div className="max-w-3xl mx-auto w-full bg-white min-h-screen shadow-md flex flex-col">
@@ -46,21 +51,23 @@ export default async function PropertyDetail({ params }) {
       </div>
 
       <div className="w-full aspect-[16/10] bg-slate-100 overflow-x-auto flex snap-x snap-mandatory no-scrollbar">
-        {danhSachAnh.map((url, idx) => (
+        {danhSachAnh.length > 0 ? danhSachAnh.map((url, idx) => (
           <div key={idx} className="w-full h-full flex-shrink-0 snap-start">
-            <img src={url} alt={item.tieude} className="w-full h-full object-cover" />
+            <img src={url} alt={item.tieude || 'Ảnh nhà đất'} className="w-full h-full object-cover" />
           </div>
-        ))}
+        )) : (
+          <div class="w-full h-full flex items-center justify-center text-slate-400 text-sm">Căn này chưa cập nhật hình ảnh</div>
+        )}
       </div>
 
       <div className="p-6 flex-1">
         <div className="flex items-center justify-between">
-          <span className="bg-amber-100 text-amber-900 font-extrabold text-lg px-4 py-1.5 rounded-xl">{item.gia}</span>
+          <span className="bg-amber-100 text-amber-900 font-extrabold text-lg px-4 py-1.5 rounded-xl">{item.gia || 'Thỏa thuận'}</span>
           <span className="text-xs text-slate-500 font-bold bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">{item.phapLy || 'Sổ hồng chính chủ'}</span>
         </div>
         
-        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-4 leading-snug">{item.tieude}</h1>
-        <p className="text-slate-500 text-sm font-semibold uppercase mt-2">📍 {item.khuVucFull || item.khuVuc}</p>
+        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-4 leading-snug">{item.tieude || 'Chưa cập nhật tiêu đề'}</h1>
+        <p className="text-slate-500 text-sm font-semibold uppercase mt-2">📍 {item.khuVucFull || 'Đà Nẵng'}</p>
 
         <div className="grid grid-cols-3 gap-2 my-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-center font-semibold">
           <div><div className="text-slate-400 text-[11px] uppercase mb-0.5 tracking-wider">Diện tích</div><strong className="text-slate-900 text-sm sm:text-base">{item.dienTich || 'N/A'}</strong></div>
@@ -69,14 +76,13 @@ export default async function PropertyDetail({ params }) {
         </div>
 
         <h2 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider mb-2">Thông tin mô tả thực tế nhà đất:</h2>
-        <p className="text-slate-700 text-sm sm:text-base leading-relaxed text-justify whitespace-pre-line mb-10">{item.moTa}</p>
+        <p className="text-slate-700 text-sm sm:text-base leading-relaxed text-justify whitespace-pre-line mb-10">{item.moTa || 'Đang cập nhật nội dung mô tả chi tiết...'}</p>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 flex gap-3 z-50 max-w-3xl mx-auto shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        <a href="tel:0931555551" className="flex-1 bg-slate-900 text-white font-extrabold rounded-xl py-3 text-center text-sm">Gọi Thỏa Thuận</a>
-        <a href="https://zalo.me/0931555551" target="_blank" className="flex-1 bg-[#0068ff] text-white font-extrabold rounded-xl py-3 text-center text-sm">Liên Hệ Zalo</a>
+        <a href="tel:0931555551" class="flex-1 bg-slate-900 text-white font-extrabold rounded-xl py-3 text-center text-sm">Gọi Thỏa Thuận</a>
+        <a href="https://zalo.me/0931555551" target="_blank" class="flex-1 bg-[#0068ff] text-white font-extrabold rounded-xl py-3 text-center text-sm">Liên Hệ Zalo</a>
       </div>
     </div>
   );
 }
-
