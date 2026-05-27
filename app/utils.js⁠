@@ -1,32 +1,31 @@
 export async function getGoogleSheetData() {
-  // ĐÃ SỬA: Thay chính xác đường link trích xuất CSV gốc từ file index.html của anh
-  const sheetUrl = "https://docs.google.com/spreadsheets/d/1-LupBV6uNuUitz4vF6pFv6MupuVDMujafqhjQBNNPTA/export?format=csv&t=123";
-
+  const sheetUrl = "https://docs.google.com/spreadsheets/d/1-LupBV6uNuUitz4vF6pFv6MupuVDMujafqhjQBNNPTA/export?format=csv";
 
   try {
-    // Tự động làm mới dữ liệu sau mỗi 5 phút (ISR)
     const res = await fetch(sheetUrl, {
-      next: { revalidate: 300 }
+      next: { revalidate: 300 } // Tự động làm mới sau 5 phút
     });
 
-    if (!res.ok) throw new Error("Không thể tải dữ liệu từ Google Sheets");
+    if (!res.ok) throw new Error("Không thể kết nối Google Sheets");
 
-    const csvText = await res.text();
+    let csvText = await res.text();
     
-    // Tách văn bản thành các dòng dữ liệu, bỏ dòng trống
-    const lines = csvText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    // THẦN CHÚ DIỆT KÝ TỰ ẨN: Xóa sạch ký tự BOM (\ufeff) phát sinh do trình duyệt di động
+    csvText = csvText.replace(/^\uFEFF/, '');
+
+    // Tách văn bản thành các dòng và dọn sạch ký tự xuống dòng ẩn (\r)
+    const lines = csvText.split('\n').map(line => line.replace(/[\r\t]/g, "").trim()).filter(line => line.length > 0);
     if (lines.length <= 1) return [];
 
-    // Lấy dòng tiêu đề đầu tiên và làm sạch các ký tự ẩn phiền toái
-    const headers = lines[0].split(',').map(h => h.replace(/[\r\n\t\"\']/g, "").trim());
+    // Lấy dòng tiêu đề đầu tiên, xóa sạch mọi dấu ngoặc kép hoặc khoảng trống ẩn
+    const headers = lines[0].split(',').map(h => h.replace(/[\"\']/g, "").trim());
 
-    // Chuyển đổi các dòng dữ liệu thành mảng đối tượng JSON
     const data = lines.slice(1).map((line, rowIndex) => {
       const values = [];
       let current = "";
       let inQuotes = false;
 
-      // Thuật toán tách dấu phẩy chuẩn xác kể cả khi ô mô tả có chứa dấu phẩy bên trong ngoặc kép
+      // Thuật toán tách dấu phẩy chuẩn xác trong ngoặc kép
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
         if (char === '"') {
@@ -43,16 +42,15 @@ export async function getGoogleSheetData() {
       const obj = {};
       headers.forEach((header, index) => {
         let val = values[index] || "";
-        // Xóa bỏ dấu ngoặc kép bọc ngoài chuỗi dữ liệu nếu có
         if (val.startsWith('"') && val.endsWith('"')) {
           val = val.slice(1, -1);
         }
-        // Làm sạch hoàn toàn ký tự xuống dòng ẩn trong ô
-        val = val.replace(/[\r\n]/g, "").trim();
+        val = val.trim();
 
-        // Ép kiểu dữ liệu chuẩn khít với file cấu hình của anh
+        // Ép kiểu dữ liệu chuẩn khít
         if (header === 'id') {
-          obj[header] = parseInt(val) || (rowIndex + 1);
+          // Chấp nhận cả ID dạng chuỗi hoặc số, miễn là có điền
+          obj[header] = val; 
         } else if (header === 'soGia') {
           obj[header] = parseFloat(val) || 0;
         } else {
@@ -63,10 +61,10 @@ export async function getGoogleSheetData() {
       return obj;
     });
 
-    // Lọc bỏ hàng lỗi, bắt buộc phải có ID và Tiêu đề nhà đất thì mới hiển thị lên trang web
-    return data.filter(item => item.id && item.tieude);
+    // LỌC AN TOÀN: Nới lỏng điều kiện, chỉ cần hàng đó có dữ liệu id là duyệt qua
+    return data.filter(item => item.id && item.id.length > 0);
   } catch (error) {
-    console.error("Lỗi đồng bộ giỏ hàng nhà đất:", error);
+    console.error("Lỗi đồng bộ giỏ hàng:", error);
     return [];
   }
 }
