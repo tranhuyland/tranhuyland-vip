@@ -1,68 +1,45 @@
+import Papa from 'papaparse';
+
 export async function getGoogleSheetData() {
   const sheetUrl = "https://docs.google.com/spreadsheets/d/1-LupBV6uNuUitz4vF6pFv6MupuVDMujafqhjQBNNPTA/export?format=csv";
 
   try {
     const res = await fetch(sheetUrl, {
-      next: { revalidate: 300 } // Tự động làm mới sau 5 phút
+      next: { revalidate: 300 } // Làm mới sau 5 phút
     });
 
     if (!res.ok) throw new Error("Không thể kết nối Google Sheets");
 
     let csvText = await res.text();
     
-    // THẦN CHÚ DIỆT KÝ TỰ ẨN: Xóa sạch ký tự BOM (\ufeff) phát sinh do trình duyệt di động
+    // Xóa ký tự BOM ẩn phát sinh trên di động
     csvText = csvText.replace(/^\uFEFF/, '');
 
-    // Tách văn bản thành các dòng và dọn sạch ký tự xuống dòng ẩn (\r)
-    const lines = csvText.split('\n').map(line => line.replace(/[\r\t]/g, "").trim()).filter(line => line.length > 0);
-    if (lines.length <= 1) return [];
-
-    // Lấy dòng tiêu đề đầu tiên, xóa sạch mọi dấu ngoặc kép hoặc khoảng trống ẩn
-    const headers = lines[0].split(',').map(h => h.replace(/[\"\']/g, "").trim());
-
-    const data = lines.slice(1).map((line, rowIndex) => {
-      const values = [];
-      let current = "";
-      let inQuotes = false;
-
-      // Thuật toán tách dấu phẩy chuẩn xác trong ngoặc kép
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          values.push(current.trim());
-          current = "";
-        } else {
-          current += char;
-        }
-      }
-      values.push(current.trim());
-
-      const obj = {};
-      headers.forEach((header, index) => {
-        let val = values[index] || "";
-        if (val.startsWith('"') && val.endsWith('"')) {
-          val = val.slice(1, -1);
-        }
-        val = val.trim();
-
-        // Ép kiểu dữ liệu chuẩn khít
-        if (header === 'id') {
-          // Chấp nhận cả ID dạng chuỗi hoặc số, miễn là có điền
-          obj[header] = val; 
-        } else if (header === 'soGia') {
-          obj[header] = parseFloat(val) || 0;
-        } else {
-          obj[header] = val;
-        }
-      });
-
-      return obj;
+    // Sử dụng thư viện PapaParse để bóc tách Excel chuẩn quốc tế, chấp nhận mọi dấu phẩy bên trong ô mô tả
+    const parsedData = Papa.parse(csvText, {
+      header: true, // Tự động lấy dòng đầu tiên làm tên cột
+      skipEmptyLines: true // Bỏ qua các dòng trống
     });
 
-    // LỌC AN TOÀN: Nới lỏng điều kiện, chỉ cần hàng đó có dữ liệu id là duyệt qua
-    return data.filter(item => item.id && item.id.length > 0);
+    const data = parsedData.data.map((item, rowIndex) => {
+      // Làm sạch dữ liệu từng ô, xóa bỏ ký tự xuống dòng ẩn \r
+      const cleanedItem = {};
+      Object.keys(item).forEach(key => {
+        const cleanKey = key.replace(/[\r\n\t]/g, "").trim();
+        let cleanVal = item[key] ? item[key].toString().replace(/[\r\n\t]/g, "").trim() : "";
+        cleanedItem[cleanKey] = cleanVal;
+      });
+
+      // Ép kiểu dữ liệu chuẩn khít
+      if (!cleanedItem.id) {
+        cleanedItem.id = (rowIndex + 1).toString();
+      }
+
+      return cleanedItem;
+    });
+
+    // Chỉ lấy các hàng thực sự có điền tiêu đề nhà đất
+    return data.filter(item => item.id && item.tieude && item.tieude.length > 0);
   } catch (error) {
     console.error("Lỗi đồng bộ giỏ hàng:", error);
     return [];
