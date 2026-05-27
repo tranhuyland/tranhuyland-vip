@@ -1,1 +1,61 @@
+export async function getGoogleSheetData() {
+  // Đường dẫn link trích xuất định dạng CSV công khai từ file Google Sheets của anh
+  const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTf579nS1IuGf-Gg3uXfXl7Z576y4Y6V9tL-u_87R2739/pub?output=csv";
+
+  try {
+    const res = await fetch(sheetUrl, {
+      next: { revalidate: 300 } // Tự động làm mới dữ liệu sau mỗi 5 phút (ISR)
+    });
+
+    if (!res.ok) throw new Error("Không thể tải dữ liệu từ Google Sheets");
+
+    const csvText = await res.text();
+    
+    // Tách văn bản thành các dòng dữ liệu rời rạc
+    const lines = csvText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    if (lines.length <= 1) return [];
+
+    // Lấy dòng tiêu đề đầu tiên làm khung mẫu thuộc tính
+    const headers = lines[0].split(',').map(h => h.trim());
+
+    // Chuyển đổi các dòng còn lại thành các đối tượng dữ liệu cụ thể
+    const data = lines.slice(1).map((line) => {
+      const values = [];
+      let current = "";
+      let inQuotes = false;
+
+      // Xử lý dấu phẩy nằm bên trong dấu ngoặc kép của phần mô tả thực tế
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim());
+
+      const obj = {};
+      headers.forEach((header, index) => {
+        // Loại bỏ các ký tự dấu ngoặc kép bọc ngoài văn bản nếu có
+        let val = values[index] || "";
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.slice(1, -1);
+        }
+        obj[header] = val;
+      });
+
+      return obj;
+    });
+
+    // Chỉ lọc lấy các căn nhà đất đã được điền đầy đủ Tiêu đề
+    return data.filter(item => item.id && item.tieude);
+  } catch (error) {
+    console.error("Lỗi đọc dữ liệu hệ thống:", error);
+    return [];
+  }
+}
 
